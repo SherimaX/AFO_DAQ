@@ -64,7 +64,7 @@ void readIMUTask() {
     t_IMU = micros();
     readIMU();
     // Serial.println(micros() - t_IMU);
-    threads.delay(1);
+    threads.yield();
     t_IMU = micros();
     
   }
@@ -695,10 +695,12 @@ void setupIMU() {
   delay(1000);
   YEIsetStreamingMode(IMU1, READ_TARED_ORIENTATION_AS_QUATERNION, READ_CORRECTED_LINEAR_ACCELERATION, READ_CORRECTED_GYROSCOPE_VECTOR, READ_CORRECTED_ACCELEROMETER_VECTOR, NO_SLOT, NO_SLOT, NO_SLOT, NO_SLOT);
 
-  sStreamingTime.interval = 2000; //10000; //[us]
+  sStreamingTime.interval = 1000; //[us]  // 1 kHz streaming rate
   sStreamingTime.duration = 0xFFFFFFFF;
   sStreamingTime.delay = 0;  //[us]
   YEIsetStreamingTime(IMU1);
+  // start streaming immediately
+  YEIwriteCommandNoDelay(IMU1, CMD_START_STREAMING);
   IMU1.flush();
   reset_imu = FALSE;
   sig = FALSE;
@@ -721,9 +723,13 @@ void readIMU() {
   }
   else
   {
-    // Read IMU data every time
-    YEIgetStreamingBatch(uStreamingDataIMU1);
-    quaternion2euler(uStreamingDataIMU1.sData.q.qw, uStreamingDataIMU1.sData.q.qy, uStreamingDataIMU1.sData.q.qz, uStreamingDataIMU1.sData.q.qx, yaw1, pitch1, roll1);
+    // Read IMU data if a full packet is available
+    if (IMU1.available() >= sizeof(uStreamingDataIMU1)) {
+      for (int i = sizeof(uStreamingDataIMU1) - 1; i >= 0; i--) {
+        uStreamingDataIMU1.vData[i] = IMU1.read();
+      }
+      quaternion2euler(uStreamingDataIMU1.sData.q.qw, uStreamingDataIMU1.sData.q.qy, uStreamingDataIMU1.sData.q.qz, uStreamingDataIMU1.sData.q.qx, yaw1, pitch1, roll1);
+    }
   }
 }
 
